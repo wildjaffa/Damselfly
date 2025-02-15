@@ -37,7 +37,7 @@ namespace Damselfly.Core.Services
             {
                 var response = await SendEmailToMailGunAsync(email, subject, htmlMessage);
                 emailRecord.Status = response.IsSuccessful ? MessageStatusEnum.Sent : MessageStatusEnum.Failed;
-                emailRecord.DateSent = DateTime.Now;
+                emailRecord.DateSent = DateTime.UtcNow;
             }
             catch( Exception ex )
             {
@@ -67,7 +67,7 @@ namespace Damselfly.Core.Services
             {
                 var response = await SendEmailToMailGunAsync(email, subject, htmlMessage);
                 emailRecord.Status = response.IsSuccessful ? MessageStatusEnum.Sent : MessageStatusEnum.Failed;
-                emailRecord.DateSent = DateTime.Now;
+                emailRecord.DateSent = DateTime.UtcNow;
             }
             catch( Exception ex )
             {
@@ -94,7 +94,7 @@ namespace Damselfly.Core.Services
                 _logger.LogInformation("Resending email with {id} to {email} with subject {subject}", emailRecord.EmailRecordId, emailRecord.Email, emailRecord.Subject);
                 var response = await SendEmailToMailGunAsync(emailRecord.Email, emailRecord.Subject, emailRecord.HtmlMessage);
                 emailRecord.Status = response.IsSuccessful ? MessageStatusEnum.Sent : MessageStatusEnum.Failed;
-                emailRecord.DateSent = DateTime.Now;
+                emailRecord.DateSent = DateTime.UtcNow;
             }
             catch( Exception ex )
             {

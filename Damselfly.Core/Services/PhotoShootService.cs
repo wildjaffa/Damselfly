@@ -426,7 +426,7 @@ namespace Damselfly.Core.Services
                 var totalPaid = photoShoot.PaymentTransactions.Sum(x => x.Amount);
                 var remainingBalance = photoShoot.Price - totalPaid;
                 var emailBody = EmailContent.FormatEmail("Payment Reminder",
-                    [$"Hey there! This is just a friendly reminder that your remaining balance of {remainingBalance} is due today after your shoot. Thanks again for your business!"],
+                    [$"Hey there! This is just a friendly reminder that your remaining balance of ${remainingBalance} is due today after your shoot. Thanks again for your business!"],
                     $"{baseUrl}/#/invoice?id={photoShoot.PhotoShootId}", "Pay Balance");
                 await _emailService.SendEmailAsync(photoShoot.ResponsiblePartyEmailAddress, "Photoshoot reminder", emailBody, photoShoot.PhotoShootId.ToString(), MessageObjectEnum.PhotoShoot);
                 photoShoot.ReminderSent = true;
