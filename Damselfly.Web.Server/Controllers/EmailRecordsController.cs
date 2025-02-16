@@ -47,16 +47,21 @@ namespace Damselfly.Web.Server.Controllers
         }
 
         [HttpPost]
-        [Route("reSend")]
+        [Route("resend")]
         [ProducesResponseType(typeof(EmailRecordModel), 200)]
-        public async Task<IActionResult> ReSendEmail(Guid emailRecordId)
+        public async Task<IActionResult> ReSendEmail(ResendEmailRequest reSendEmailRequest)
         {
-            var result = await _emailService.ReSendEmailAsync(emailRecordId);
+            var result = await _emailService.ReSendEmailAsync(reSendEmailRequest.EmailRecordId);
             if( result == null )
             {
                 return NotFound();
             }
             return Ok(result);
         }
+    }
+
+    public class ResendEmailRequest
+    {
+        public Guid EmailRecordId { get; set; }
     }
 }
