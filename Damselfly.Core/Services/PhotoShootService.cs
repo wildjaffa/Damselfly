@@ -87,9 +87,10 @@ namespace Damselfly.Core.Services
                 var emailBody = EmailContent.FormatEmail("Photos Delivered",
                     [
                         "Your photos are ready!", 
-                        $"Thank you again for letting me take your photos! Your link and pin are below.",
+                        "Thank you again for letting me take your photos! Your link and pin are below.",
                         "I highly recommend downloading rather than taking a screenshot as downloading will give you a higher quality and sharpness. There are options on download size - with higher quality it can take multiple minutes to prepare your download.",
                         "If there are any changes you would like made, please feel free to reach out and I am happy to adjust where I can. When posting online, I'd love for you to tag me (unless you've made any editing changes yourself as then it is no longer fully my work)! This helps my business grow and I always love seeing which photos you choose to share!",
+                        "You can tag me on Instagram at @honeyandthymephotography or on Facebook at @Honey+Thyme Photography",
                         "Enjoy!",
                         "",
                         $"Password: {album.Password}"

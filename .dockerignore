@@ -25,3 +25,4 @@
 Dameselfly.Web/config
 LICENSE
 README.md
+*/appsettings.Development.json
