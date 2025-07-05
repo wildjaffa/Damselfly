@@ -1,13 +1,13 @@
 # This workflow builds the .NET solution and creates a Docker image on push to main
 # It also validates build on pull requests to main
 
-name: CI/CD
+name: Docker Publish
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
 
