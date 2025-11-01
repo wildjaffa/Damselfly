@@ -31,9 +31,12 @@ jobs:
         run: |
           # Build newline-separated tags list using the branch name
           BRANCH_NAME=${GITHUB_REF_NAME}
+          # Replace slashes in branch names with dashes so Docker tags are valid
+          BRANCH_SAFE=${BRANCH_NAME//\//-}
           REPO_OWNER=${GITHUB_REPOSITORY_OWNER}
           IMAGE_BASE="ghcr.io/${REPO_OWNER}/damselfly"
-          TAGS="${IMAGE_BASE}:${BRANCH_NAME}"
+          TAGS="${IMAGE_BASE}:${BRANCH_SAFE}"
+          # Keep the 'latest' tag when the real branch name is exactly 'master'
           if [ "${BRANCH_NAME}" = "master" ]; then
             TAGS="${TAGS}\n${IMAGE_BASE}:latest"
           fi
