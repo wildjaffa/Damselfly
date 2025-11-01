@@ -19,10 +19,10 @@ namespace Damselfly.Web.Server.Controllers
         [HttpGet]
         [Route("{id}")]
         [ProducesResponseType(typeof(EmailRecordModel), 200)]
-        public async Task<IActionResult> GetById(Guid id)
+        public async Task<ActionResult<EmailRecordModel>> GetById(Guid id)
         {
             var result = await _emailService.GetEmailRecordAsync(id);
-            if( result == null )
+            if (result == null)
             {
                 return NotFound();
             }
@@ -32,14 +32,26 @@ namespace Damselfly.Web.Server.Controllers
         [HttpGet]
         [Route("getRecords")]
         [ProducesResponseType(typeof(PaginationResultModel<EmailRecordModel>), 200)]
-        public async Task<IActionResult> GetPaginatedResults([FromQuery] int page, [FromQuery] int pageSize, [FromQuery] MessageObjectEnum? objectType, [FromQuery] string? messageObjectId)
+        public async Task<
+            ActionResult<PaginationResultModel<EmailRecordModel>>
+        > GetPaginatedResults(
+            [FromQuery] int page,
+            [FromQuery] int pageSize,
+            [FromQuery] MessageObjectEnum? objectType,
+            [FromQuery] string? messageObjectId
+        )
         {
-            if( page < 0 || pageSize < 1 || pageSize > 100)
+            if (page < 0 || pageSize < 1 || pageSize > 100)
             {
                 return BadRequest("Page cannot be less than 0 and pageSize must between 1 and 100");
             }
-            var result = await _emailService.GetEmailRecordsAsync(page, pageSize, objectType, messageObjectId);
-            if( result == null )
+            var result = await _emailService.GetEmailRecordsAsync(
+                page,
+                pageSize,
+                objectType,
+                messageObjectId
+            );
+            if (result == null)
             {
                 return NotFound();
             }
@@ -49,10 +61,12 @@ namespace Damselfly.Web.Server.Controllers
         [HttpPost]
         [Route("resend")]
         [ProducesResponseType(typeof(EmailRecordModel), 200)]
-        public async Task<IActionResult> ReSendEmail(ResendEmailRequest reSendEmailRequest)
+        public async Task<ActionResult<EmailRecordModel>> ReSendEmail(
+            ResendEmailRequest reSendEmailRequest
+        )
         {
             var result = await _emailService.ReSendEmailAsync(reSendEmailRequest.EmailRecordId);
-            if( result == null )
+            if (result == null)
             {
                 return NotFound();
             }

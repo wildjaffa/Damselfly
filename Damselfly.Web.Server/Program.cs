@@ -3,10 +3,16 @@ using Damselfly.Core.Constants;
 using Damselfly.Core.Database;
 using Damselfly.Core.DbModels.Authentication;
 using Damselfly.Core.ImageProcessing;
+using Damselfly.Core.ScopedServices.Interfaces;
 using Damselfly.Core.Services;
 using Damselfly.Core.Utils;
+using Damselfly.PaymentProcessing;
 using Damselfly.Shared.Utils;
+using Damselfly.Web.Server.CustomAttributes;
+using Hangfire;
+using Hangfire.MemoryStorage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
@@ -14,18 +20,13 @@ using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Serilog.Events;
 using ILogger = Serilog.ILogger;
-using Damselfly.Core.ScopedServices.Interfaces;
-using Damselfly.Web.Server.CustomAttributes;
-using Microsoft.AspNetCore.Authorization;
-using Hangfire;
-using Hangfire.MemoryStorage;
-using Damselfly.PaymentProcessing;
 
 namespace Damselfly.Web;
 
 public class Program
 {
     private static BackgroundJobServer backgroundJobServer;
+
     public static void Main(string[] args)
     {
         try
@@ -33,7 +34,7 @@ public class Program
             // Parser.Default.ParseArguments<DamselflyOptions>(args).WithParsed(o => { Startup(o, args); });
             StartWebServer(args);
         }
-        catch ( Exception ex )
+        catch (Exception ex)
         {
             Console.WriteLine($"Startup exception: {ex}");
         }
@@ -41,20 +42,23 @@ public class Program
 
     private static void SetupDbContext(WebApplicationBuilder builder)
     {
-
         var connectionString = builder.Configuration["DamselflyConfiguration:ConnectionString"];
 
         // Add services to the container.
-        builder.Services.AddDbContext<ImageContext>(options => {
-            options.UseNpgsql(connectionString,
-                       b =>
-                       {
-                           b.MigrationsAssembly("Damselfly.Migrations.Postgres");
-                           b.UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery);
-                       });
-            
-        }, ServiceLifetime.Transient);
-
+        builder.Services.AddDbContext<ImageContext>(
+            options =>
+            {
+                options.UseNpgsql(
+                    connectionString,
+                    b =>
+                    {
+                        b.MigrationsAssembly("Damselfly.Migrations.Postgres");
+                        b.UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery);
+                    }
+                );
+            },
+            ServiceLifetime.Transient
+        );
     }
 
     /// <summary>
@@ -67,29 +71,30 @@ public class Program
     private static void StartWebServer(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        
+
         Logging.Verbose = builder.Configuration["DamselflyConfiguration:Verbose"] == "true";
         Logging.Trace = builder.Configuration["DamselflyConfiguration:Trace"] == "true";
 
-        builder.Host.UseSerilog((hostContext, services, configuration) =>
-        {
-            Logging.InitLogConfiguration(configuration, builder.Configuration);
-        });
+        builder.Host.UseSerilog(
+            (hostContext, services, configuration) =>
+            {
+                Logging.InitLogConfiguration(configuration, builder.Configuration);
+            }
+        );
 
         SetupDbContext(builder);
 
         SetupIdentity(builder.Services, builder.Configuration);
 
-        
-
         // Cache up to 10,000 images. Should be enough given cache expiry.
         builder.Services.AddMemoryCache(x => x.SizeLimit = 5000);
 
-        builder.Services.AddControllers()
-            .AddJsonOptions(o => { 
+        builder
+            .Services.AddControllers()
+            .AddJsonOptions(o =>
+            {
                 o.JsonSerializerOptions.AllowTrailingCommas = true;
-                o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve;
-             });
+            });
 
         // Server to client notifications
         builder.Services.AddSignalR();
@@ -98,11 +103,12 @@ public class Program
             opts.Providers.Add<BrotliCompressionProvider>();
             opts.Providers.Add<GzipCompressionProvider>();
             opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
-                new[] { "image/svg+xml",  "application/octet-stream" });
+                new[] { "image/svg+xml", "application/octet-stream" }
+            );
         });
 
         builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
-        
+
         builder.Services.AddHangfire(config =>
         {
             config.UseSerilogLogProvider();
@@ -118,14 +124,19 @@ public class Program
         builder.Services.AddPaymentServices();
         builder.Services.AddHostedBlazorBackEndServices();
         var port = int.Parse(builder.Configuration["DamselflyConfiguration:Port"]);
-        if( ! Debugger.IsAttached )
+        if (!Debugger.IsAttached)
         {
             // Use Kestrel options to set the port. Using .Urls.Add breaks WASM debugging.
             // This line also breaks wasm debugging in Rider.
             // See https://github.com/dotnet/aspnetcore/issues/43703
-            builder.WebHost.UseKestrel(serverOptions => { serverOptions.ListenAnyIP(port); });
+            builder.WebHost.UseKestrel(serverOptions =>
+            {
+                serverOptions.ListenAnyIP(port);
+            });
         }
-        var allowedOrigins = builder.Configuration["DamselflyConfiguration:AllowedOrigins"]?.Split(",");
+        var allowedOrigins = builder
+            .Configuration["DamselflyConfiguration:AllowedOrigins"]
+            ?.Split(",");
         const string allowAllorigins = "AllowAllOrigins";
         const string allowSpecificOrigins = "AllowSpecificOrigins";
         builder.Services.AddCors(options =>
@@ -134,21 +145,16 @@ public class Program
                 allowAllorigins,
                 builder =>
                 {
-                    builder
-                    .AllowAnyOrigin()
-                    .AllowAnyMethod()
-                    .AllowAnyHeader();
+                    builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
                 }
             );
             options.AddPolicy(
                 allowSpecificOrigins,
                 builder =>
                 {
-                    builder
-                    .WithOrigins(allowedOrigins)
-                    .AllowAnyMethod()
-                    .AllowAnyHeader();
-                });
+                    builder.WithOrigins(allowedOrigins).AllowAnyMethod().AllowAnyHeader();
+                }
+            );
         });
 
         var app = builder.Build();
@@ -165,19 +171,18 @@ public class Program
         //app.UseSerilogIngestion();
 
         var configService = app.Services.GetRequiredService<ConfigService>();
-        var logLevelString = builder.Configuration["Logging:LogLevel:Default"];  // configService.Get(ConfigSettings.LogLevel, LogEventLevel.Information);
+        var logLevelString = builder.Configuration["Logging:LogLevel:Default"]; // configService.Get(ConfigSettings.LogLevel, LogEventLevel.Information);
         var logLevel = LogEventLevel.Information;
-        if( Enum.TryParse<LogEventLevel>(logLevelString, true, out var parsedLevel) )
+        if (Enum.TryParse<LogEventLevel>(logLevelString, true, out var parsedLevel))
             logLevel = parsedLevel;
 
-        if( app.Configuration["DamselflyConfiguration:NoGenerateThumbnails"] == "true" )
-            configService.Set( ConfigSettings.EnableBackgroundThumbs, false.ToString() );
-        
+        if (app.Configuration["DamselflyConfiguration:NoGenerateThumbnails"] == "true")
+            configService.Set(ConfigSettings.EnableBackgroundThumbs, false.ToString());
 
         Logging.ChangeLogLevel(logLevel);
 
         // Configure the HTTP request pipeline.
-        if ( app.Environment.IsDevelopment() )
+        if (app.Environment.IsDevelopment())
         {
             app.UseMigrationsEndPoint();
             app.UseWebAssemblyDebugging();
@@ -192,14 +197,18 @@ public class Program
         app.UseHttpsRedirection();
 
         app.UseBlazorFrameworkFiles();
-        
+
         // TODO: Do we need this if we serve all the images via the controller?
         app.UseStaticFiles();
-        app.UseStaticFiles(new StaticFileOptions
-        {
-            FileProvider = new PhysicalFileProvider(app.Configuration["DamselflyConfiguration:SourceDirectory"]),
-            RequestPath = "/download" // ThumbnailService.RequestRoot
-        });
+        app.UseStaticFiles(
+            new StaticFileOptions
+            {
+                FileProvider = new PhysicalFileProvider(
+                    app.Configuration["DamselflyConfiguration:SourceDirectory"]
+                ),
+                RequestPath = "/download", // ThumbnailService.RequestRoot
+            }
+        );
 
         app.UseStaticFiles();
         app.UseResponseCompression();
@@ -211,14 +220,14 @@ public class Program
         app.UseCors(allowSpecificOrigins);
 #endif
 
-        if( Debugger.IsAttached )
+        // if (Debugger.IsAttached)
+        // {
+        app.UseSwagger();
+        app.UseSwaggerUI(c =>
         {
-            app.UseSwagger();
-            app.UseSwaggerUI( c =>
-            {
-                c.SwaggerEndpoint( "/swagger/v1/swagger.json", "Damselfly API" );
-            } );
-        }
+            c.SwaggerEndpoint("/swagger/v1/swagger.json", "Damselfly API");
+        });
+        // }
 
         // Map the signalR notifications endpoints
 
@@ -232,22 +241,29 @@ public class Program
         app.MapFallbackToFile("index.html");
         TokenEncryption.Initialize(app.Configuration);
 
-
         app.UseHangfireServer();
 #if DEBUG
-        app.UseHangfireDashboard("/hangfire", new DashboardOptions
-        {
-        });
+        app.UseHangfireDashboard("/hangfire", new DashboardOptions { });
 #endif
 
-
-        RecurringJob.AddOrUpdate<DownloadService>("CleanupDownloads", d => d.CleanUpOldDownloads(TimeSpan.FromHours(6)), "0 */6 * * *");
-        RecurringJob.AddOrUpdate<PhotoShootService>("SendReminderEmails", d=> d.SendReminderEmails(), "0 9 * * *");
-        RecurringJob.AddOrUpdate<PhotoShootService>("ResetUnpaidShoots", d => d.ResetUnpaidShoots(), "0/5 * * * *");
+        RecurringJob.AddOrUpdate<DownloadService>(
+            "CleanupDownloads",
+            d => d.CleanUpOldDownloads(TimeSpan.FromHours(6)),
+            "0 */6 * * *"
+        );
+        RecurringJob.AddOrUpdate<PhotoShootService>(
+            "SendReminderEmails",
+            d => d.SendReminderEmails(),
+            "0 9 * * *"
+        );
+        RecurringJob.AddOrUpdate<PhotoShootService>(
+            "ResetUnpaidShoots",
+            d => d.ResetUnpaidShoots(),
+            "0/5 * * * *"
+        );
         Logging.Log("Starting Damselfly webserver...");
 
         app.Run();
-        
     }
 
     private static void InitialiseDB(WebApplication app)
@@ -255,21 +271,21 @@ public class Program
         using var scope = app.Services.CreateScope();
         using var db = scope.ServiceProvider.GetService<ImageContext>();
 
-        if( db != null )
+        if (db != null)
         {
             try
             {
-                Logging.Log( "Running DB migrations..." );
+                Logging.Log("Running DB migrations...");
                 db.Database.Migrate();
             }
-            catch( Exception ex )
+            catch (Exception ex)
             {
-                Logging.LogWarning( $"Migrations failed with exception: {ex}" );
+                Logging.LogWarning($"Migrations failed with exception: {ex}");
 
-                if( ex.InnerException != null )
-                    Logging.LogWarning( $"InnerException: {ex.InnerException}" );
+                if (ex.InnerException != null)
+                    Logging.LogWarning($"InnerException: {ex.InnerException}");
 
-                Logging.Log( "Creating DB." );
+                Logging.Log("Creating DB.");
                 db.Database.EnsureCreated();
             }
 
@@ -279,13 +295,20 @@ public class Program
         }
     }
 
-    private static void SetupIdentity(IServiceCollection services, ConfigurationManager configuration)
+    private static void SetupIdentity(
+        IServiceCollection services,
+        ConfigurationManager configuration
+    )
     {
-        services.AddDefaultIdentity<AppIdentityUser>(options => options.SignIn.RequireConfirmedAccount = false)
+        services
+            .AddDefaultIdentity<AppIdentityUser>(options =>
+                options.SignIn.RequireConfirmedAccount = false
+            )
             .AddRoles<ApplicationRole>()
             .AddEntityFrameworkStores<ImageContext>();
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        services
+            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
                 options.Audience = configuration["Jwt:Firebase:ValidAudience"];
@@ -297,12 +320,17 @@ public class Program
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
                     ValidIssuer = configuration["Jwt:Firebase:ValidIssuer"],
-                    ValidAudience = configuration["Jwt:Firebase:ValidAudience"]
+                    ValidAudience = configuration["Jwt:Firebase:ValidAudience"],
                 };
             });
         var serviceProvider = services.BuildServiceProvider();
         var httpContextAccessor = serviceProvider.GetService<IHttpContextAccessor>();
-        services.AddAuthorization(config => config.AddPolicy(PolicyDefinitions.s_FireBaseAdmin, policy => policy.Requirements.Add(new AuthorizeFireBase(httpContextAccessor))));
+        services.AddAuthorization(config =>
+            config.AddPolicy(
+                PolicyDefinitions.s_FireBaseAdmin,
+                policy => policy.Requirements.Add(new AuthorizeFireBase(httpContextAccessor))
+            )
+        );
         // services.AddAuthorization(config => config.SetupPolicies(services));
 
         //services.AddSingleton<AuthenticationStateProvider, ApiAuthenticationStateProvider>();

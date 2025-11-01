@@ -14,7 +14,6 @@ namespace Damselfly.Core.DbModels.Models.API_Models
         /// </summary>
         [Required]
         public string AuthCode { get; set; }
-        
     }
 
     /// <summary>
@@ -26,16 +25,23 @@ namespace Damselfly.Core.DbModels.Models.API_Models
         /// Whether the operation was successful
         /// </summary>
         public bool Success { get; set; }
-        
+
         /// <summary>
         /// Error message if the operation failed
         /// </summary>
         public string ErrorMessage { get; set; }
-        
+
         /// <summary>
         /// Whether the user has valid Google Calendar tokens
         /// </summary>
         public bool HasValidTokens { get; set; }
+    }
+
+    public class GoogleCalendarCallBackResponse
+    {
+        public string Message { get; set; }
+        public string Code { get; set; }
+        public string State { get; set; }
     }
 
     /// <summary>
@@ -48,24 +54,24 @@ namespace Damselfly.Core.DbModels.Models.API_Models
         /// </summary>
         [Required]
         public string Summary { get; set; }
-        
+
         /// <summary>
         /// Event description
         /// </summary>
         public string Description { get; set; }
-        
+
         /// <summary>
         /// Event start time
         /// </summary>
         [Required]
         public DateTime StartTime { get; set; }
-        
+
         /// <summary>
         /// Event end time
         /// </summary>
         [Required]
         public DateTime EndTime { get; set; }
-        
+
         /// <summary>
         /// Time zone for the event
         /// </summary>
@@ -75,4 +81,4 @@ namespace Damselfly.Core.DbModels.Models.API_Models
 
         public string? CalendarId { get; set; } = "primary";
     }
-} 
+}

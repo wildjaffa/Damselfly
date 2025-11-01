@@ -11,23 +11,26 @@ using Damselfly.Web.Server.CustomAttributes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 namespace Damselfly.Web.Controllers;
 
 //[Authorize(Policy = PolicyDefinitions.s_IsLoggedIn)]
 [Route("images")]
 [ApiController]
-public class ImageController(ImageService imageService, ILogger<ImageController> logger) : Controller
+public class ImageController(ImageService imageService, ILogger<ImageController> logger)
+    : Controller
 {
     private readonly ILogger<ImageController> _logger = logger;
     private readonly ImageService _imageService = imageService;
 
-    
     [HttpPost]
     [ProducesResponseType(typeof(List<ImageModel>), 200)]
     [Route("upload")]
     [Authorize(Policy = PolicyDefinitions.s_FireBaseAdmin)]
-    public async Task<IActionResult> UploadImage([FromForm] UploadImageRequest uploadImageRequest)
+    public async Task<ActionResult<List<ImageModel>>> UploadImage(
+        [FromForm] UploadImageRequest uploadImageRequest
+    )
     {
         _logger.LogInformation($"Uploading {uploadImageRequest.ImageFiles.Count} image(s)");
         var watch = new Stopwatch("ControllerPostImage");
@@ -42,10 +45,10 @@ public class ImageController(ImageService imageService, ILogger<ImageController>
     [HttpGet]
     [Route("imageData/{id}")]
     [ProducesResponseType(typeof(ImageModel), 200)]
-    public async Task<IActionResult> GetImageData(Guid id, [FromQuery] string? password)
+    public async Task<ActionResult<ImageModel>> GetImageData(Guid id, [FromQuery] string? password)
     {
         var image = await _imageService.GetImageData(id, password);
-        if ( image == null )
+        if (image == null)
             return NotFound();
         return Ok(image);
     }
@@ -54,11 +57,11 @@ public class ImageController(ImageService imageService, ILogger<ImageController>
     [Route("{id}")]
     [ProducesResponseType(typeof(BooleanResultModel), 200)]
     [Authorize(Policy = PolicyDefinitions.s_FireBaseAdmin)]
-    public async Task<IActionResult> DeleteImage(Guid id)
+    public async Task<ActionResult<BooleanResultModel>> DeleteImage(Guid id)
     {
         var result = await _imageService.DeleteImage(id);
-        if ( result )
-            return Ok(new BooleanResultModel{ Result = true });
+        if (result)
+            return Ok(new BooleanResultModel { Result = true });
         return NotFound();
     }
 
@@ -112,14 +115,23 @@ public class ImageController(ImageService imageService, ILogger<ImageController>
 
     [Produces("image/jpeg")]
     [HttpGet("/thumb/{thumbSize}/{imageId}")]
-    public async Task<IActionResult> Thumb(string thumbSize, string imageId, CancellationToken cancel,
-        [FromServices] ImageCache imageCache, [FromServices] ThumbnailService thumbService, [FromQuery] string? password)
+    public async Task<IActionResult> Thumb(
+        string thumbSize,
+        string imageId,
+        CancellationToken cancel,
+        [FromServices] ImageCache imageCache,
+        [FromServices] ThumbnailService thumbService,
+        [FromQuery] string? password
+    )
     {
         var watch = new Stopwatch("ControllerGetThumb");
 
         IActionResult result = Redirect("/no-image.png");
 
-        if ( Enum.TryParse<ThumbSize>(thumbSize, true, out var size) && Guid.TryParse(imageId, out var id) )
+        if (
+            Enum.TryParse<ThumbSize>(thumbSize, true, out var size)
+            && Guid.TryParse(imageId, out var id)
+        )
             try
             {
                 Logging.LogTrace($"Controller - Getting Thumb for {imageId}");
@@ -130,12 +142,12 @@ public class ImageController(ImageService imageService, ILogger<ImageController>
                 }
                 var image = await imageCache.GetCachedImage(id);
 
-                if ( cancel.IsCancellationRequested )
+                if (cancel.IsCancellationRequested)
                     return result;
 
-                if ( image != null )
+                if (image != null)
                 {
-                    if ( cancel.IsCancellationRequested )
+                    if (cancel.IsCancellationRequested)
                         return result;
 
                     Logging.LogTrace($" - Getting thumb path for {imageId}");
@@ -144,25 +156,26 @@ public class ImageController(ImageService imageService, ILogger<ImageController>
                     var imagePath = thumbService.GetThumbPath(file, size);
                     var gotThumb = true;
 
-
-                    if ( !System.IO.File.Exists(imagePath) )
+                    if (!System.IO.File.Exists(imagePath))
                     {
                         gotThumb = false;
-                        Logging.LogTrace($" - Generating thumbnail on-demand for {image.FileName}...");
+                        Logging.LogTrace(
+                            $" - Generating thumbnail on-demand for {image.FileName}..."
+                        );
 
-                        if ( cancel.IsCancellationRequested )
+                        if (cancel.IsCancellationRequested)
                             return result;
 
                         var conversionResult = await thumbService.ConvertFile(image, false, size);
 
-                        if ( conversionResult.ThumbsGenerated )
+                        if (conversionResult.ThumbsGenerated)
                             gotThumb = true;
                     }
 
-                    if ( cancel.IsCancellationRequested )
+                    if (cancel.IsCancellationRequested)
                         return result;
 
-                    if ( gotThumb )
+                    if (gotThumb)
                     {
                         Logging.LogTrace($" - Loading file for {imageId}");
 
@@ -172,9 +185,12 @@ public class ImageController(ImageService imageService, ILogger<ImageController>
                     Logging.LogTrace($"Controller - served thumb for {imageId}");
                 }
             }
-            catch ( Exception ex )
+            catch (Exception ex)
             {
-                Logging.LogError($"Unable to process /thumb/{thumbSize}/{imageId}: {ex.Message}");
+                _logger.LogError(ex, "Something went very wrong");
+                Logging.LogError(
+                    $"Unable to process /thumb/{thumbSize}/{imageId}: {ex.Message} {ex.StackTrace}"
+                );
             }
 
         watch.Stop();
@@ -182,12 +198,16 @@ public class ImageController(ImageService imageService, ILogger<ImageController>
         return result;
     }
 
-    private async Task UpdateThumbStatus(Image image, IImageProcessResult conversionResult, ImageContext db)
+    private async Task UpdateThumbStatus(
+        Image image,
+        IImageProcessResult conversionResult,
+        ImageContext db
+    )
     {
         Logging.LogTrace($" - Updating metadata for {image.ImageId}");
         try
         {
-            if ( image.MetaData != null )
+            if (image.MetaData != null)
             {
                 db.Attach(image.MetaData);
                 image.MetaData.ThumbLastUpdated = DateTime.UtcNow;
@@ -198,7 +218,7 @@ public class ImageController(ImageService imageService, ILogger<ImageController>
                 var metadata = new ImageMetaData
                 {
                     ImageId = image.ImageId,
-                    ThumbLastUpdated = DateTime.UtcNow
+                    ThumbLastUpdated = DateTime.UtcNow,
                 };
                 db.ImageMetaData.Add(metadata);
                 image.MetaData = metadata;
@@ -206,7 +226,7 @@ public class ImageController(ImageService imageService, ILogger<ImageController>
 
             await db.SaveChangesAsync("ThumbUpdate");
         }
-        catch ( Exception ex )
+        catch (Exception ex)
         {
             Logging.LogWarning($"Unable to update DB thumb for ID {image.ImageId}: {ex.Message}");
         }

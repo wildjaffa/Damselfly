@@ -15,7 +15,10 @@ public class UserManagementController : ControllerBase
     private readonly ILogger<UserManagementController> _logger;
     private readonly IUserMgmtService _service;
 
-    public UserManagementController(IUserMgmtService service, ILogger<UserManagementController> logger)
+    public UserManagementController(
+        IUserMgmtService service,
+        ILogger<UserManagementController> logger
+    )
     {
         _service = service;
         _logger = logger;
@@ -24,12 +27,11 @@ public class UserManagementController : ControllerBase
     [HttpPost]
     [Authorize]
     [Route("signedIn")]
-    public async Task<IActionResult> SignedIn()
+    public async Task<ActionResult<SignedInResponse>> SignedIn()
     {
         var user = HttpContext.User;
         var appUser = await _service.GetOrCreateUser(user);
-        
+
         return Ok(new SignedInResponse { UserId = appUser.Id, UserName = appUser.UserName });
     }
-
 }

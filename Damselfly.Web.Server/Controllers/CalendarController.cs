@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Damselfly.Core.Constants;
 using Damselfly.Core.DbModels.Models.API_Models;
 using Damselfly.Core.ScopedServices.Interfaces;
@@ -5,14 +6,16 @@ using Damselfly.Core.Services;
 using Google.Apis.Calendar.v3.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace Damselfly.Web.Server.Controllers
 {
     [ApiController]
     [Route("Calendar")]
     [Authorize(Policy = PolicyDefinitions.s_FireBaseAdmin)]
-    public class CalendarController(GoogleCalendarService googleCalendarService, IAuthService authService) : ControllerBase
+    public class CalendarController(
+        GoogleCalendarService googleCalendarService,
+        IAuthService authService
+    ) : ControllerBase
     {
         private readonly GoogleCalendarService _googleCalendarService = googleCalendarService;
         private readonly IAuthService _authService = authService;
@@ -24,7 +27,9 @@ namespace Damselfly.Web.Server.Controllers
         /// <returns>Success status and any error messages</returns>
         [HttpPost("exchange-auth-code")]
         [ProducesResponseType(typeof(GoogleCalendarAuthResponse), 200)]
-        public async Task<IActionResult> ExchangeAuthCode([FromBody] GoogleCalendarAuthRequest request)
+        public async Task<ActionResult<GoogleCalendarAuthResponse>> ExchangeAuthCode(
+            [FromBody] GoogleCalendarAuthRequest request
+        )
         {
             if (!ModelState.IsValid)
             {
@@ -36,8 +41,11 @@ namespace Damselfly.Web.Server.Controllers
             {
                 return Unauthorized("User not authenticated");
             }
-            var result = await _googleCalendarService.ExchangeAuthCodeForTokensAsync(request.AuthCode, user.Id);
-            
+            var result = await _googleCalendarService.ExchangeAuthCodeForTokensAsync(
+                request.AuthCode,
+                user.Id
+            );
+
             if (result.Success)
             {
                 return Ok(result);
@@ -70,7 +78,7 @@ namespace Damselfly.Web.Server.Controllers
         //    }
 
         //    var result = await _googleCalendarService.CreateCalendarEventAsync(userId, eventRequest);
-            
+
         //    if (result.Success)
         //    {
         //        return Ok(result);
@@ -87,13 +95,13 @@ namespace Damselfly.Web.Server.Controllers
         /// <returns>Whether the user has valid tokens</returns>
         [HttpGet("has-valid-tokens")]
         [ProducesResponseType(typeof(BooleanResultModel), 200)]
-        public async Task<IActionResult> HasValidTokens()
+        public async Task<ActionResult<BooleanResultModel>> HasValidTokens()
         {
-            var currentUser = await _authService.GetCurrentUser();  
+            var currentUser = await _authService.GetCurrentUser();
 
             var hasValidTokens = await _googleCalendarService.HasValidTokensAsync(currentUser!.Id);
-            
-            return Ok(new BooleanResultModel{ Result = hasValidTokens });
+
+            return Ok(new BooleanResultModel { Result = hasValidTokens });
         }
 
         /// <summary>
@@ -101,19 +109,19 @@ namespace Damselfly.Web.Server.Controllers
         /// </summary>
         /// <returns>Success status</returns>
         [HttpPost("revoke-tokens")]
-        public async Task<IActionResult> RevokeTokens()
+        public async Task<ActionResult<BooleanResultModel>> RevokeTokens()
         {
             var currentUser = await _authService.GetCurrentUser();
 
             var success = await _googleCalendarService.RevokeTokensAsync(currentUser!.Id);
-            
+
             if (success)
             {
-                return Ok(new { Success = true });
+                return Ok(new BooleanResultModel { Result = true });
             }
             else
             {
-                return BadRequest(new { Success = false, ErrorMessage = "Failed to revoke tokens" });
+                return BadRequest(new BooleanResultModel { Result = false });
             }
         }
 
@@ -124,7 +132,10 @@ namespace Damselfly.Web.Server.Controllers
         /// <param name="state">State parameter for security</param>
         /// <returns>Success page or error</returns>
         [HttpGet("callback")]
-        public IActionResult Callback([FromQuery] string code, [FromQuery] string state)
+        public ActionResult<GoogleCalendarCallBackResponse> Callback(
+            [FromQuery] string code,
+            [FromQuery] string state
+        )
         {
             if (string.IsNullOrEmpty(code))
             {
@@ -134,11 +145,15 @@ namespace Damselfly.Web.Server.Controllers
             // For now, return a simple success page
             // In a real implementation, you might want to redirect to a frontend page
             // or handle the code exchange here if the user is already authenticated
-            return Ok(new { 
-                Message = "Authorization code received successfully. Please use the exchange-auth-code endpoint to complete the process.",
-                Code = code,
-                State = state
-            });
+            return Ok(
+                new GoogleCalendarCallBackResponse
+                {
+                    Message =
+                        "Authorization code received successfully. Please use the exchange-auth-code endpoint to complete the process.",
+                    Code = code,
+                    State = state,
+                }
+            );
         }
 
         /// <summary>
@@ -146,7 +161,7 @@ namespace Damselfly.Web.Server.Controllers
         /// </summary>
         [HttpGet("list-calendars")]
         [ProducesResponseType(typeof(List<CalendarListEntry>), 200)]
-        public async Task<IActionResult> ListCalendars()
+        public async Task<ActionResult<List<CalendarListEntry>>> ListCalendars()
         {
             var currentUser = await _authService.GetCurrentUser();
 
@@ -157,11 +172,12 @@ namespace Damselfly.Web.Server.Controllers
             }
 
             // Return a simplified list (id, summary, description, primary)
-            var result = calendars.Select(c => new {
+            var result = calendars.Select(c => new
+            {
                 c.Id,
                 c.Summary,
                 c.Description,
-                c.Primary
+                c.Primary,
             });
             return Ok(result);
         }
@@ -171,7 +187,7 @@ namespace Damselfly.Web.Server.Controllers
         /// </summary>
         [HttpGet("settings")]
         [ProducesResponseType(typeof(GoogleCalendarSettingsModel), 200)]
-        public async Task<IActionResult> GetCalendarSettings()
+        public async Task<ActionResult<GoogleCalendarSettingsModel>> GetCalendarSettings()
         {
             var currentUser = await _authService.GetCurrentUser();
 
@@ -183,10 +199,15 @@ namespace Damselfly.Web.Server.Controllers
         /// Sets the user's Google Calendar settings
         /// </summary>
         [HttpPost("settings")]
-        public async Task<IActionResult> SetCalendarSettings([FromBody] GoogleCalendarSettingsModel settings)
+        public async Task<ActionResult> SetCalendarSettings(
+            [FromBody] GoogleCalendarSettingsModel settings
+        )
         {
             var currentUser = await _authService.GetCurrentUser();
-            var result = await _googleCalendarService.SetCalendarSettingsAsync(currentUser!.Id, settings);
+            var result = await _googleCalendarService.SetCalendarSettingsAsync(
+                currentUser!.Id,
+                settings
+            );
             if (result)
                 return Ok();
             return BadRequest();

@@ -5,9 +5,10 @@ name: Docker Publish
 
 on:
   push:
-    branches: [ master ]
+    # Run on all branches so we can tag images by branch name
+    branches: [ '**' ]
   pull_request:
-    branches: [ master ]
+    branches: [ '**' ]
 
 jobs:
 
@@ -25,9 +26,25 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set image tags
+        id: set-tags
+        run: |
+          # Build newline-separated tags list using the branch name
+          BRANCH_NAME=${GITHUB_REF_NAME}
+          REPO_OWNER=${GITHUB_REPOSITORY_OWNER}
+          IMAGE_BASE="ghcr.io/${REPO_OWNER}/damselfly"
+          TAGS="${IMAGE_BASE}:${BRANCH_NAME}"
+          if [ "${BRANCH_NAME}" = "master" ]; then
+            TAGS="${TAGS}\n${IMAGE_BASE}:latest"
+          fi
+          # Set multiline output 'tags'
+          echo "tags<<EOF" >> $GITHUB_OUTPUT
+          echo -e "${TAGS}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/damselfly:latest
+          # Use the generated tags (branch name and optional latest)
+          tags: ${{ steps.set-tags.outputs.tags }}

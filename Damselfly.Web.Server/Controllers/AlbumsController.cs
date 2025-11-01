@@ -2,11 +2,11 @@ using Damselfly.Core.Constants;
 using Damselfly.Core.DbModels.Authentication;
 using Damselfly.Core.DbModels.Models.API_Models;
 using Damselfly.Core.DbModels.Models.Entities;
+using Damselfly.Core.Models;
 using Damselfly.Core.Services;
 using Damselfly.Web.Server.CustomAttributes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Damselfly.Core.Models;
 
 namespace Damselfly.Web.Server.Controllers
 {
@@ -15,15 +15,13 @@ namespace Damselfly.Web.Server.Controllers
     [Route("albums")]
     public class AlbumsController(AlbumService albumService) : ControllerBase
     {
-
         private readonly AlbumService _albumService = albumService;
 
         [HttpPost]
         [Route("create")]
         [Authorize(Policy = PolicyDefinitions.s_FireBaseAdmin)]
-        public async Task<IActionResult> CreateAlbum(AlbumModel albumModel)
+        public async Task<ActionResult<AlbumModel>> CreateAlbum(AlbumModel albumModel)
         {
-
             var result = await _albumService.CreateAlbum(albumModel);
 
             return Ok(result);
@@ -32,9 +30,8 @@ namespace Damselfly.Web.Server.Controllers
         [HttpPost]
         [Route("update")]
         [Authorize(Policy = PolicyDefinitions.s_FireBaseAdmin)]
-        public async Task<IActionResult> UpdateAlbum(AlbumModel albumModel)
+        public async Task<ActionResult<AlbumModel>> UpdateAlbum(AlbumModel albumModel)
         {
-
             var result = await _albumService.UpdateAlbum(albumModel);
 
             return Ok(result);
@@ -43,9 +40,10 @@ namespace Damselfly.Web.Server.Controllers
         [HttpPost]
         [Route("unlock")]
         [Authorize(Policy = PolicyDefinitions.s_FireBaseAdmin)]
-        public async Task<IActionResult> UnlockAlbum(AlbumModel albumModel)
+        public async Task<ActionResult<AlbumModel>> UnlockAlbum(AlbumModel albumModel)
         {
-            if (albumModel.AlbumId == null) return BadRequest();
+            if (albumModel.AlbumId == null)
+                return BadRequest();
             var result = await _albumService.UnlockAlbum(albumModel.AlbumId.Value);
 
             return Ok(result);
@@ -54,7 +52,9 @@ namespace Damselfly.Web.Server.Controllers
         [HttpPost]
         [Route("AddExistingImages")]
         [Authorize(Policy = PolicyDefinitions.s_FireBaseAdmin)]
-        public async Task<IActionResult> AddExistingImages(AddExistingImagesToAlbumRequest model)
+        public async Task<ActionResult<BooleanResultModel>> AddExistingImages(
+            AddExistingImagesToAlbumRequest model
+        )
         {
             var result = await _albumService.AddImagesToAlbum(model);
 
@@ -64,9 +64,8 @@ namespace Damselfly.Web.Server.Controllers
         [HttpGet]
         [Route("all")]
         [Authorize(Policy = PolicyDefinitions.s_FireBaseAdmin)]
-        public async Task<IActionResult> GetAllAlbums()
+        public async Task<ActionResult<List<AlbumModel>>> GetAllAlbums()
         {
-
             var result = await _albumService.GetAlbums();
 
             return Ok(result);
@@ -80,11 +79,15 @@ namespace Damselfly.Web.Server.Controllers
         [HttpGet]
         [Route("paginated")]
         [Authorize(Policy = PolicyDefinitions.s_FireBaseAdmin)]
-        public async Task<ActionResult<PaginationResultModel<AlbumModel>>> GetPaginatedAlbums([FromQuery] AlbumsPaginationRequest request)
+        public async Task<ActionResult<PaginationResultModel<AlbumModel>>> GetPaginatedAlbums(
+            [FromQuery] AlbumsPaginationRequest request
+        )
         {
             if (request.PageIndex < 0 || request.PageSize < 1 || request.PageSize > 100)
             {
-                return BadRequest("PageIndex cannot be less than 0 and PageSize must be between 1 and 100");
+                return BadRequest(
+                    "PageIndex cannot be less than 0 and PageSize must be between 1 and 100"
+                );
             }
 
             var result = await _albumService.GetAlbumsPaginated(request);
@@ -93,23 +96,28 @@ namespace Damselfly.Web.Server.Controllers
 
         [HttpGet]
         [Route("{id}")]
-        public async Task<IActionResult> GetAlbum(string id, [FromQuery] string? password)
+        public async Task<ActionResult<AlbumModel?>> GetAlbum(
+            string id,
+            [FromQuery] string? password
+        )
         {
             if (Guid.TryParse(id, out var guidId))
             {
                 var album = await _albumService.GetAlbum(guidId, password);
-                if(album == null) return NotFound();
+                if (album == null)
+                    return NotFound();
                 return Ok(album);
             }
             var result = await _albumService.GetByName(id, password);
-            if( result == null ) return NotFound();
+            if (result == null)
+                return NotFound();
             return Ok(result);
         }
 
         [HttpDelete]
         [Route("{id}")]
         [Authorize(Policy = PolicyDefinitions.s_FireBaseAdmin)]
-        public async Task<IActionResult> DeleteAlbum(string id)
+        public async Task<ActionResult<BooleanResultModel>> DeleteAlbum(string id)
         {
             if (Guid.TryParse(id, out var guidId))
             {
@@ -124,9 +132,10 @@ namespace Damselfly.Web.Server.Controllers
         [HttpPost]
         [Route("QueueScan")]
         [Authorize(Policy = PolicyDefinitions.s_FireBaseAdmin)]
-        public IActionResult QueueScan(AlbumModel albumModel)
+        public ActionResult<BooleanResultModel> QueueScan(AlbumModel albumModel)
         {
-            if( albumModel.AlbumId == null ) return BadRequest("AlbumId is required");
+            if (albumModel.AlbumId == null)
+                return BadRequest("AlbumId is required");
             var result = AlbumService.QueueAlbumScan(albumModel.AlbumId.Value);
 
             return Ok(new BooleanResultModel { Result = result });

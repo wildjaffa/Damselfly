@@ -16,7 +16,7 @@ namespace Damselfly.Web.Server.Controllers
         [HttpPost]
         [Route("create")]
         [ProducesResponseType(typeof(ProductModel), 200)]
-        public async Task<IActionResult> CreatePhotoShoot(ProductModel productModel)
+        public async Task<ActionResult<ProductModel>> CreatePhotoShoot(ProductModel productModel)
         {
             var created = await _productService.CreateProduct(productModel);
             return Ok(created);
@@ -24,12 +24,12 @@ namespace Damselfly.Web.Server.Controllers
 
         [HttpDelete]
         [Route("{id}")]
-        public async Task<IActionResult> DeletePhotoShoot(string id)
+        public async Task<ActionResult<BooleanResultModel>> DeletePhotoShoot(string id)
         {
-            if( !Guid.TryParse(id, out var productId) )
+            if (!Guid.TryParse(id, out var productId))
                 return BadRequest("id is required");
             var success = await _productService.DeleteProduct(productId);
-            if( !success )
+            if (!success)
             {
                 return BadRequest();
             }
@@ -40,7 +40,7 @@ namespace Damselfly.Web.Server.Controllers
         [HttpPost]
         [Route("update")]
         [ProducesResponseType(typeof(ProductModel), 200)]
-        public async Task<IActionResult> UpdatePhotoShoot(ProductModel productModel)
+        public async Task<ActionResult<ProductModel>> UpdatePhotoShoot(ProductModel productModel)
         {
             var result = await _productService.UpdateProduct(productModel);
             return Ok(result);
@@ -49,22 +49,21 @@ namespace Damselfly.Web.Server.Controllers
         [HttpGet]
         [Route("list")]
         [ProducesResponseType(typeof(List<ProductModel>), 200)]
-        public async Task<IActionResult> GetProducts()
+        public async Task<ActionResult<List<ProductModel>>> GetProducts()
         {
             var result = await _productService.GetProducts();
             return Ok(result);
         }
 
-
         [HttpGet]
         [Route("{id}")]
         [ProducesResponseType(typeof(ProductModel), 200)]
-        public async Task<IActionResult> GetPhotoShootById(string id)
+        public async Task<ActionResult<ProductModel>> GetPhotoShootById(string id)
         {
-            if( !Guid.TryParse(id, out var productId) )
+            if (!Guid.TryParse(id, out var productId))
                 return BadRequest("id is required");
             var result = await _productService.GetProductById(productId);
-            if( result == null )
+            if (result == null)
                 return NotFound();
             return Ok(result);
         }
