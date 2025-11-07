@@ -145,7 +145,7 @@ public class Program
                 allowAllorigins,
                 builder =>
                 {
-                    builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader().AllowCredentials();
+                    builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
                 }
             );
             options.AddPolicy(
