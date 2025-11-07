@@ -145,14 +145,18 @@ public class Program
                 allowAllorigins,
                 builder =>
                 {
-                    builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+                    builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader().AllowCredentials();
                 }
             );
             options.AddPolicy(
                 allowSpecificOrigins,
                 builder =>
                 {
-                    builder.WithOrigins(allowedOrigins).AllowAnyMethod().AllowAnyHeader();
+                    builder
+                        .WithOrigins(allowedOrigins)
+                        .AllowAnyMethod()
+                        .AllowAnyHeader()
+                        .AllowCredentials();
                 }
             );
         });
