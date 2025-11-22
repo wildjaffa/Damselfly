@@ -525,6 +525,19 @@ namespace Damselfly.Core.Services
             {
                 return false;
             }
+
+            // Check if IP is whitelisted for bypass (staging/testing)
+            var bypassIpsConfig = _configuration["DamselflyConfiguration:FraudCheckBypassIps"];
+            if (!string.IsNullOrWhiteSpace(bypassIpsConfig))
+            {
+                var bypassIps = bypassIpsConfig.Split(',');
+                if (bypassIps.Any(ip => userIp.StartsWith(ip.Trim())))
+                {
+                    _logger.LogInformation("IP {ip} is whitelisted, skipping fraud check", userIp);
+                    return true;
+                }
+            }
+
             _logger.LogInformation("Doing fraud check for {ip}", userIp);
             var cacheKey = $"FraudCheck-{userIp}";
             var cacheValue = await _cacheService.GetAsync(cacheKey);
