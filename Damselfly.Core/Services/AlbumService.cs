@@ -49,6 +49,7 @@ namespace Damselfly.Core.Services
         {
             var album = _mapper.Map<Album>(albumModel);
             var root = _configuration["DamselflyConfiguration:SourceDirectory"];
+            // TODO: We aren't accounting for duplicate urlNames, we need to add safety for that
             var folderPath = Path.Combine(root, album.UrlName);
             var parentFolder = await _context.Folders.FirstOrDefaultAsync(f => f.ParentId == null);
             var folder = new Folder { Path = folderPath, ParentId = parentFolder!.FolderId };
