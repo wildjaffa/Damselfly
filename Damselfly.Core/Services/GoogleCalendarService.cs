@@ -1,6 +1,11 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Damselfly.Core.Database;
-using Damselfly.Core.DbModels.Models.Entities;
 using Damselfly.Core.DbModels.Models.API_Models;
+using Damselfly.Core.DbModels.Models.Entities;
 using Damselfly.Core.Utils;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
@@ -8,21 +13,17 @@ using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
 using Google.Apis.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
-using System.Linq;
 
 namespace Damselfly.Core.Services
 {
     public class GoogleCalendarService(
         ILogger<GoogleCalendarService> logger,
         IConfiguration configuration,
-        ImageContext dbContext)
+        ImageContext dbContext
+    )
     {
         private readonly ILogger<GoogleCalendarService> _logger = logger;
         private readonly IConfiguration _configuration = configuration;
@@ -37,7 +38,10 @@ namespace Damselfly.Core.Services
         /// <param name="authCode">The authorization code from Google</param>
         /// <param name="userId">The user ID to associate the tokens with</param>
         /// <returns>Success status and any error messages</returns>
-        public async Task<GoogleCalendarAuthResponse> ExchangeAuthCodeForTokensAsync(string authCode, int userId)
+        public async Task<GoogleCalendarAuthResponse> ExchangeAuthCodeForTokensAsync(
+            string authCode,
+            int userId
+        )
         {
             try
             {
@@ -51,44 +55,50 @@ namespace Damselfly.Core.Services
                     return new GoogleCalendarAuthResponse
                     {
                         Success = false,
-                        ErrorMessage = "Google OAuth credentials not configured"
+                        ErrorMessage = "Google OAuth credentials not configured",
                     };
                 }
 
-                var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
-                {
-                    ClientSecrets = new ClientSecrets
+                var flow = new GoogleAuthorizationCodeFlow(
+                    new GoogleAuthorizationCodeFlow.Initializer
                     {
-                        ClientId = clientId,
-                        ClientSecret = clientSecret
-                    },
-                    Scopes = Scopes
-                });
+                        ClientSecrets = new ClientSecrets
+                        {
+                            ClientId = clientId,
+                            ClientSecret = clientSecret,
+                        },
+                        Scopes = Scopes,
+                    }
+                );
 
                 var tokenResponse = await flow.ExchangeCodeForTokenAsync(
                     userId.ToString(),
                     authCode,
                     redirectUri,
-                    CancellationToken.None);
+                    CancellationToken.None
+                );
 
                 // Encrypt and store the tokens
                 await StoreTokensAsync(userId, tokenResponse);
 
-                _logger.LogInformation("Successfully exchanged auth code for tokens for user {UserId}", userId);
+                _logger.LogInformation(
+                    "Successfully exchanged auth code for tokens for user {UserId}",
+                    userId
+                );
 
-                return new GoogleCalendarAuthResponse
-                {
-                    Success = true,
-                    HasValidTokens = true
-                };
+                return new GoogleCalendarAuthResponse { Success = true, HasValidTokens = true };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error exchanging auth code for tokens for user {UserId}", userId);
+                _logger.LogError(
+                    ex,
+                    "Error exchanging auth code for tokens for user {UserId}",
+                    userId
+                );
                 return new GoogleCalendarAuthResponse
                 {
                     Success = false,
-                    ErrorMessage = ex.Message
+                    ErrorMessage = ex.Message,
                 };
             }
         }
@@ -102,8 +112,10 @@ namespace Damselfly.Core.Services
             var encryptedRefreshToken = TokenEncryption.Encrypt(tokenResponse.RefreshToken);
             var expiryTime = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresInSeconds ?? 3600);
 
-            var existingToken = await _dbContext.GoogleCalendarTokens.FirstOrDefaultAsync(t => t.UserId == userId);
-            
+            var existingToken = await _dbContext.GoogleCalendarTokens.FirstOrDefaultAsync(t =>
+                t.UserId == userId
+            );
+
             if (existingToken != null)
             {
                 // Update existing token
@@ -124,7 +136,7 @@ namespace Damselfly.Core.Services
                     TokenExpiryUtc = expiryTime,
                     CreatedUtc = DateTime.UtcNow,
                     LastUpdatedUtc = DateTime.UtcNow,
-                    IsValid = true
+                    IsValid = true,
                 };
 
                 _dbContext.GoogleCalendarTokens.Add(newToken);
@@ -143,11 +155,13 @@ namespace Damselfly.Core.Services
             {
                 return null;
             }
-            return new CalendarService(new BaseClientService.Initializer()
-            {
-                HttpClientInitializer = userCredential,
-                ApplicationName = _configuration["Google:ApplicationName"]
-            });
+            return new CalendarService(
+                new BaseClientService.Initializer()
+                {
+                    HttpClientInitializer = userCredential,
+                    ApplicationName = _configuration["Google:ApplicationName"],
+                }
+            );
         }
 
         /// <summary>
@@ -156,7 +170,10 @@ namespace Damselfly.Core.Services
         /// <param name="userId">The user ID</param>
         /// <param name="eventRequest">The event details</param>
         /// <returns>Success status and any error messages</returns>
-        public async Task<Event?> CreateCalendarEventAsync(int userId, CreateCalendarEventRequest eventRequest)
+        public async Task<Event?> CreateCalendarEventAsync(
+            int userId,
+            CreateCalendarEventRequest eventRequest
+        )
         {
             try
             {
@@ -173,20 +190,25 @@ namespace Damselfly.Core.Services
                     Start = new EventDateTime
                     {
                         DateTimeDateTimeOffset = eventRequest.StartTime,
-                        TimeZone = eventRequest.TimeZone
+                        TimeZone = eventRequest.TimeZone,
                     },
                     End = new EventDateTime
                     {
                         DateTimeDateTimeOffset = eventRequest.EndTime,
-                        TimeZone = eventRequest.TimeZone
+                        TimeZone = eventRequest.TimeZone,
                     },
-                    Attendees = eventRequest.Attendees.Select(a => new EventAttendee { Email = a }).ToArray()
+                    Attendees = eventRequest
+                        .Attendees.Select(a => new EventAttendee { Email = a })
+                        .ToArray(),
                 };
 
                 var request = service.Events.Insert(calendarEvent, eventRequest.CalendarId);
                 var result = await request.ExecuteAsync();
 
-                _logger.LogInformation("Successfully created calendar event for user {UserId}", userId);
+                _logger.LogInformation(
+                    "Successfully created calendar event for user {UserId}",
+                    userId
+                );
 
                 return result;
             }
@@ -205,7 +227,12 @@ namespace Damselfly.Core.Services
         /// <param name="eventRequest">The updated event details</param>
         /// <param name="calendarId">The calendar ID (defaults to "primary")</param>
         /// <returns>Success status and any error messages</returns>
-        public async Task<Event?> UpdateCalendarEventAsync(int userId, string eventId, CreateCalendarEventRequest eventRequest, string calendarId = "primary")
+        public async Task<Event?> UpdateCalendarEventAsync(
+            int userId,
+            string eventId,
+            CreateCalendarEventRequest eventRequest,
+            string calendarId = "primary"
+        )
         {
             try
             {
@@ -219,7 +246,11 @@ namespace Damselfly.Core.Services
                 var existingEvent = await service.Events.Get(calendarId, eventId).ExecuteAsync();
                 if (existingEvent == null)
                 {
-                    _logger.LogError("Calendar event {EventId} not found for user {UserId}", eventId, userId);
+                    _logger.LogError(
+                        "Calendar event {EventId} not found for user {UserId}",
+                        eventId,
+                        userId
+                    );
                     return null;
                 }
 
@@ -229,24 +260,33 @@ namespace Damselfly.Core.Services
                 existingEvent.Start = new EventDateTime
                 {
                     DateTimeDateTimeOffset = eventRequest.StartTime,
-                    TimeZone = eventRequest.TimeZone
+                    TimeZone = eventRequest.TimeZone,
                 };
                 existingEvent.End = new EventDateTime
                 {
                     DateTimeDateTimeOffset = eventRequest.EndTime,
-                    TimeZone = eventRequest.TimeZone
+                    TimeZone = eventRequest.TimeZone,
                 };
 
                 var updateRequest = service.Events.Update(existingEvent, calendarId, eventId);
                 var result = await updateRequest.ExecuteAsync();
 
-                _logger.LogInformation("Successfully updated calendar event {EventId} for user {UserId}", eventId, userId);
+                _logger.LogInformation(
+                    "Successfully updated calendar event {EventId} for user {UserId}",
+                    eventId,
+                    userId
+                );
 
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating calendar event {EventId} for user {UserId}", eventId, userId);
+                _logger.LogError(
+                    ex,
+                    "Error updating calendar event {EventId} for user {UserId}",
+                    eventId,
+                    userId
+                );
                 return null;
             }
         }
@@ -256,7 +296,9 @@ namespace Damselfly.Core.Services
         /// </summary>
         private async Task<UserCredential> GetUserCredentialAsync(int userId)
         {
-            var tokenRecord = await _dbContext.GoogleCalendarTokens.FirstOrDefaultAsync(t => t.UserId == userId);
+            var tokenRecord = await _dbContext.GoogleCalendarTokens.FirstOrDefaultAsync(t =>
+                t.UserId == userId
+            );
             if (tokenRecord == null || !tokenRecord.IsValid)
             {
                 return null;
@@ -265,15 +307,17 @@ namespace Damselfly.Core.Services
             var clientId = _configuration["Google:ClientId"];
             var clientSecret = _configuration["Google:ClientSecret"];
 
-            var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
-            {
-                ClientSecrets = new ClientSecrets
+            var flow = new GoogleAuthorizationCodeFlow(
+                new GoogleAuthorizationCodeFlow.Initializer
                 {
-                    ClientId = clientId,
-                    ClientSecret = clientSecret
-                },
-                Scopes = Scopes
-            });
+                    ClientSecrets = new ClientSecrets
+                    {
+                        ClientId = clientId,
+                        ClientSecret = clientSecret,
+                    },
+                    Scopes = Scopes,
+                }
+            );
 
             var decryptedAccessToken = TokenEncryption.Decrypt(tokenRecord.EncryptedAccessToken);
             var decryptedRefreshToken = TokenEncryption.Decrypt(tokenRecord.EncryptedRefreshToken);
@@ -281,7 +325,7 @@ namespace Damselfly.Core.Services
             var tokenResponse = new TokenResponse
             {
                 AccessToken = decryptedAccessToken,
-                RefreshToken = decryptedRefreshToken
+                RefreshToken = decryptedRefreshToken,
             };
 
             var credential = new UserCredential(flow, userId.ToString(), tokenResponse);
@@ -292,7 +336,7 @@ namespace Damselfly.Core.Services
                 try
                 {
                     await credential.RefreshTokenAsync(CancellationToken.None);
-                    
+
                     // Update the stored tokens with the new ones
                     await StoreTokensAsync(userId, credential.Token);
                 }
@@ -319,7 +363,6 @@ namespace Damselfly.Core.Services
             return credential != null;
         }
 
-
         /// <summary>
         /// Revokes the Google Calendar tokens for a user
         /// </summary>
@@ -329,7 +372,9 @@ namespace Damselfly.Core.Services
         {
             try
             {
-                var tokenRecord = await _dbContext.GoogleCalendarTokens.FirstOrDefaultAsync(t => t.UserId == userId);
+                var tokenRecord = await _dbContext.GoogleCalendarTokens.FirstOrDefaultAsync(t =>
+                    t.UserId == userId
+                );
                 if (tokenRecord != null)
                 {
                     tokenRecord.IsValid = false;
@@ -367,17 +412,25 @@ namespace Damselfly.Core.Services
         public async Task<GoogleCalendarSettingsModel?> GetCalendarSettingsAsync(int userId)
         {
             var user = await _dbContext.Users.FindAsync(userId);
-            if (user == null) return null;
-            return new GoogleCalendarSettingsModel { PreferredCalendarId = user.PreferredCalendarId };
+            if (user == null)
+                return null;
+            return new GoogleCalendarSettingsModel
+            {
+                PreferredCalendarId = user.PreferredCalendarId,
+            };
         }
 
         /// <summary>
         /// Sets the user's Google Calendar settings
         /// </summary>
-        public async Task<bool> SetCalendarSettingsAsync(int userId, GoogleCalendarSettingsModel settings)
+        public async Task<bool> SetCalendarSettingsAsync(
+            int userId,
+            GoogleCalendarSettingsModel settings
+        )
         {
             var user = await _dbContext.Users.FindAsync(userId);
-            if (user == null) return false;
+            if (user == null)
+                return false;
             user.PreferredCalendarId = settings?.PreferredCalendarId;
             _dbContext.Users.Update(user);
             await _dbContext.SaveChangesAsync();
@@ -391,7 +444,11 @@ namespace Damselfly.Core.Services
         /// <param name="externalCalendarId">The external calendar event ID</param>
         /// <param name="calendarId">The calendar ID (defaults to "primary")</param>
         /// <returns>Success status and any error messages</returns>
-        public async Task<GoogleCalendarAuthResponse> DeleteCalendarEventAsync(int userId, string externalCalendarId, string calendarId = "primary")
+        public async Task<GoogleCalendarAuthResponse> DeleteCalendarEventAsync(
+            int userId,
+            string externalCalendarId,
+            string calendarId = "primary"
+        )
         {
             try
             {
@@ -401,27 +458,33 @@ namespace Damselfly.Core.Services
                     return new GoogleCalendarAuthResponse
                     {
                         Success = false,
-                        ErrorMessage = "No valid credentials found for user"
+                        ErrorMessage = "No valid credentials found for user",
                     };
                 }
 
                 var deleteRequest = service.Events.Delete(calendarId, externalCalendarId);
                 await deleteRequest.ExecuteAsync();
 
-                _logger.LogInformation("Successfully deleted calendar event {EventId} for user {UserId}", externalCalendarId, userId);
+                _logger.LogInformation(
+                    "Successfully deleted calendar event {EventId} for user {UserId}",
+                    externalCalendarId,
+                    userId
+                );
 
-                return new GoogleCalendarAuthResponse
-                {
-                    Success = true
-                };
+                return new GoogleCalendarAuthResponse { Success = true };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting calendar event {EventId} for user {UserId}", externalCalendarId, userId);
+                _logger.LogError(
+                    ex,
+                    "Error deleting calendar event {EventId} for user {UserId}",
+                    externalCalendarId,
+                    userId
+                );
                 return new GoogleCalendarAuthResponse
                 {
                     Success = false,
-                    ErrorMessage = ex.Message
+                    ErrorMessage = ex.Message,
                 };
             }
         }

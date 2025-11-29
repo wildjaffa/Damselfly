@@ -7,7 +7,7 @@ public enum ExportType
     Wordpress = 2,
     Facebook = 3,
     Twitter = 4,
-    Instagram = 5
+    Instagram = 5,
 }
 
 public enum ExportSize
@@ -16,5 +16,5 @@ public enum ExportSize
     Large = 1,
     Medium = 2,
     Small = 3,
-    ExtraLarge = 4
+    ExtraLarge = 4,
 }

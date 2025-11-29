@@ -295,7 +295,7 @@ namespace Damselfly.Core.Services
                     "",
                     $"Password: {album.Password}",
                 ],
-                $"{baseUrl}/#/albums/{album.UrlName}",
+                $"{baseUrl}/albums/{album.UrlName}",
                 "View Photos"
             );
             await _emailService.SendEmailAsync(
@@ -340,7 +340,7 @@ namespace Damselfly.Core.Services
                         "Hello!",
                         $"Your photoshoot for {GetLocalTimeStringFromUtc(photoShoot.DateTimeUtc)} has been scheduled but is not confirmed until deposit is paid. You can do this with the button below.",
                     ],
-                    $"{baseUrl}/#/invoice?id={photoShoot.ReservationCode}",
+                    $"{baseUrl}/invoice/{photoShoot.ReservationCode}",
                     "Pay Deposit"
                 );
                 await _emailService.SendEmailAsync(
@@ -462,15 +462,15 @@ namespace Damselfly.Core.Services
             CreatePhotoShootPaymentRequest photoShootPayment
         )
         {
-            if (!await ValidateNotFraud())
-            {
-                return new CreatePhotoShootPaymentResponse
-                {
-                    IsSuccess = false,
-                    ReservationCode = photoShootPayment.ReservationCode,
-                    ProcessorEnum = photoShootPayment.PaymentProcessorEnum,
-                };
-            }
+            // if (!await ValidateNotFraud())
+            // {
+            //     return new CreatePhotoShootPaymentResponse
+            //     {
+            //         IsSuccess = false,
+            //         ReservationCode = photoShootPayment.ReservationCode,
+            //         ProcessorEnum = photoShootPayment.PaymentProcessorEnum,
+            //     };
+            // }
 
             _logger.LogInformation(
                 "Creating payment with amount {amount} for photoshoot with reservationCode {reservationCode}",
@@ -887,7 +887,7 @@ namespace Damselfly.Core.Services
                     [
                         $"Hey there! This is just a friendly reminder that your remaining balance of ${remainingBalance} is due today after your shoot. Thanks again for your business!",
                     ],
-                    $"{baseUrl}/#/invoice?id={photoShoot.ReservationCode}",
+                    $"{baseUrl}/invoice?id={photoShoot.ReservationCode}",
                     "Pay Balance"
                 );
                 await _emailService.SendEmailAsync(
