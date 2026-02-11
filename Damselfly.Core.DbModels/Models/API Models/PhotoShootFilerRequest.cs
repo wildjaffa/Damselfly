@@ -1,9 +1,9 @@
-using Damselfly.Core.DbModels.Models.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Damselfly.Core.DbModels.Models.Enums;
 
 namespace Damselfly.Core.DbModels.Models.API_Models
 {
@@ -13,5 +13,6 @@ namespace Damselfly.Core.DbModels.Models.API_Models
         public DateTime? EndDate { get; set; }
         public List<PhotoShootStatusEnum>? Statuses { get; set; }
         public PhotoShootTypeEnum? PhotoShootType { get; set; }
+        public string? SearchString { get; set; }
     }
 }

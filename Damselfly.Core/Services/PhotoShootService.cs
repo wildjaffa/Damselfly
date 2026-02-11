@@ -430,6 +430,16 @@ namespace Damselfly.Core.Services
             if (filter?.PhotoShootType.HasValue == true)
                 query = query.Where(x => x.PhotoShootType == filter.PhotoShootType.Value);
 
+            if (!string.IsNullOrWhiteSpace(filter?.SearchString))
+            {
+                var lowerSearch = filter.SearchString.ToLower();
+                query = query.Where(x =>
+                    x.Album.Name.ToLower().Contains(lowerSearch)
+                    || x.NameOfShoot.ToLower().Contains(lowerSearch)
+                    || x.ResponsiblePartyName.ToLower().Contains(lowerSearch)
+                );
+            }
+
             return query
                 .Include(x => x.PaymentTransactions.Where(t => !t.IsCancelled))
                 .OrderBy(x => x.DateTimeUtc);
