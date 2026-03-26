@@ -296,7 +296,7 @@ namespace Damselfly.Core.Services
                     StartInfo = new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = "chmod",
-                        Arguments = "766 " + directory.FullName,
+                        Arguments = "777 " + directory.FullName,
                         RedirectStandardOutput = true,
                         UseShellExecute = false,
                         CreateNoWindow = true,
